@@ -1,2 +1,3 @@
-# machinelearning_group10
-Machine Learning 
+# Machine learning project
+
+Finishing Bach's unfinished fugue

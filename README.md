@@ -1,3 +1,3 @@
 # Machine learning project
 
-Finishing Bach's unfinished fugue
+Finishing Russian HardBach's

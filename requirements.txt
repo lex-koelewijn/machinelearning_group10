@@ -1,0 +1,5 @@
+pandas==0.24.2
+matplotlib==3.1.2
+numpy==1.17.4
+jupyterlab
+jupytext

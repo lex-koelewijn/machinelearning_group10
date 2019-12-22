@@ -78,20 +78,17 @@ for i in range(0,X_train.shape[0]):
 coeff_df = pd.DataFrame(regressor.coef_, columns=['Coefficient'])
 # #Coeffecients currently represent which of the past 20 notes in the window is most influential for the prediction.
 print(coeff_df)
-# -
 
+# +
 #Make predictions of our test data based on trained model
 y_pred = np.empty((X_test.shape[0], X_test.shape[1]))
-print(X_test[0,:,:])
+
 #Go through each testing window and predict. 
 for i in range(0,X_test.shape[0]):
     y_pred[i] = regressor.predict(X_test[i,:,:])
-print((y_pred[0])))
-test = 0 
-for val in y_pred[0]:
-    test += abs(val)
-print(test)
 
+
+# -
 
 #Return the original integer note with the highest probability from the prediction. 
 def one_hot_to_original_data(y_onehot,y):

@@ -28,7 +28,7 @@ from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 #Train a linear model
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
 regressor = LinearRegression()
 regressor.fit(X_train, y_train)
 
@@ -126,13 +126,14 @@ onehot_encoder = OneHotEncoder(sparse=False)
 y_onehot = onehot_encoder.fit_transform(y.reshape(len(y),1))
 X_onehot = onehot_encoder.fit_transform(X)
 
+print(X_onehot.shape)
 
 
 # +
 X_train, X_test, y_train, y_test = train_test_split(X_onehot, y_onehot, test_size=0.2, random_state=0)
 
-#Train a linear model by going through each window of training data seperately. 
-regressor = LinearRegression()
+#Train a ridge regression model on training data.  
+regressor = Ridge()
 regressor.fit(X_train,y_train)
 
 #Make predictions for test data 
@@ -152,5 +153,31 @@ print('Mean Absolute Error:', metrics.mean_absolute_error(y_test_orig, y_pred_or
 print('Mean Squared Error:', metrics.mean_squared_error(y_test_orig, y_pred_orig))
 print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test_orig, y_pred_orig)))
 # -
+# Predict a new signal based on the last part of the signal and the window size
+
+# +
+#Define how many stes we want to predict and init required arrays
+steps_to_predict = 100
+signal = dataset.loc[:,2].to_numpy() #Get the original signal
+new_part = np.empty(steps_to_predict) 
+
+#For the amount of steps to predict, predict a new note using the past x notes as defined in the window size. 
+#Then append this new note to the signal and predict again using a window over the last notes in the signal.
+#So new notes also infuence the prediction. 
+for i in range(0,steps_to_predict):
+    window = signal[len(signal)-window_size-1:len(signal)-1]
+    x = onehot_encoder.transform(window.reshape(1,-1))
+    next_prob = regressor.predict(x)
+    next_note = one_hot_to_original_data(next_prob, y)
+    np.append(signal, next_note)
+    new_part[i] = next_note
+    
+print("Newly predicted notes: \n", new_part)
+# -
+
+
+
+
+
 
 

@@ -6,25 +6,26 @@ from midiutil import MIDIFile
 
 # ### Data
 
-F = pd.read_csv('data/F.txt', sep='\t', header=None)
-F.head()
-F.describe()
+df_input = pd.read_csv('data/F.txt', sep='\t', header=None)
+df_input.head()
 
 
 # ### Helper functions
 
-def convert_channel(channel):
-    converted_channel = []
-    duration = 1
+# This function turns ```0 0 0 0 1 1``` into ```(0, 4), (1, 2)```. This is required for proper playback.
+
+def convert(channel):
+    converted = []
+    duration = 0
     last_pitch = 0
     for pitch in channel:
         if pitch is last_pitch:
             duration += 1
         else:
-            converted_channel.append((last_pitch, duration))
+            converted.append((last_pitch, duration))
             duration = 1
         last_pitch = pitch
-    return converted_channel
+    return converted
 
 
 # # MIDI MAGIC
@@ -39,9 +40,9 @@ rythm = 4
 MyMIDI = MIDIFile(1)
 MyMIDI.addTempo(track, time, tempo)
 
-for channel in F:
+for channel in df_input:
     time_passed = 0
-    for pitch, duration in convert_channel(F[channel]):
+    for pitch, duration in convert(df_input[channel]):
         if pitch is not 0:
             MyMIDI.addNote(track, channel, pitch, (time + time_passed)/rythm, duration, volume)
         time_passed += duration

@@ -32,7 +32,7 @@ sorted_notes = sorted(y_df['notes'].unique())
 print(sorted_notes)
 
 # We want to find out if for example every four values have a correlation
-fig = sm.graphics.tsa.plot_acf(dataset.loc[:,2], lags=5)
+fig = sm.graphics.tsa.plot_acf(dataset.loc[:,2], lags=16)
 # Does not seem that there is a correlation when taking the n-order difference
 
 # +
@@ -200,10 +200,33 @@ for i in range(0,steps_to_predict):
     
 print("Newly predicted notes: \n", new_part)
 # -
+# # Add features to vector encoding
+# Start off by encoding the signal by notes and their duration rather than just single notes.
+
+# Opsplitsen in repetition van 16 is waarschijnlijk het handigst. Langere noten worden er dan meerdere.<br>
+# *Convert signal into note+duration <br>
+# *Create slices<br>
+# *Convert slices to one hot slices<br>
+# *Train regressor etc. <br>
+
+signal = dataset.loc[:,2]
 
 
+def convert_to_note_and_duration(signal):
+    converted_signal = []
+    duration = 1
+    last_note = 0
+    for note in signal:
+        if note is last_note and duration < 16:
+            duration += 1
+        else:
+            converted_signal.append((last_note, duration))
+            duration = 1
+        last_note = note
+    return converted_signal
 
 
-
+result = convert_to_note_and_duration(signal)
+print(result)
 
 

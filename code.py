@@ -32,7 +32,7 @@ sorted_notes = sorted(y_df['notes'].unique())
 print(sorted_notes)
 
 # We want to find out if for example every four values have a correlation
-fig = sm.graphics.tsa.plot_acf(x, lags=5)
+fig = sm.graphics.tsa.plot_acf(dataset.loc[:,2], lags=5)
 # Does not seem that there is a correlation when taking the n-order difference
 
 # +
@@ -152,7 +152,7 @@ from sklearn.preprocessing import OneHotEncoder
 onehot_encoder = OneHotEncoder(sparse=False)
 y_onehot = onehot_encoder.fit_transform(y.reshape(len(y),1))
 X_onehot = onehot_encoder.fit_transform(X)
-print(decoded_y_onehot)
+
 
 
 # +

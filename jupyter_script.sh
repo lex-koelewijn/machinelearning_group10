@@ -9,6 +9,8 @@ read filename
 
 echo "[script] Converting $filename.py to $filename.ipynb"
 jupytext --to ipynb $filename.py
+echo "[script] Trusting $filename.ipynb"
+jupyter trust $filename.ipynb
 echo "[script] Starting Jupyter Lab server"
 jupyter lab
 echo "[script] Converting $filename.ipynb back to $filename.py"

@@ -319,7 +319,59 @@ new_signal = to_signal_long(new)
 print(new_signal)
 np.savetxt(r'new_signal.txt', new_signal, fmt='%d')
 # -
+# Find optimal window size
+
+max_size = 100
+performance = np.empty((max_size+1, 7))
+for window_size in range(1,max_size):
+    signal = dataset.loc[:,2]
+    #Rewrite to note + duration
+    signal_rewritten = convert_to_note_and_duration(signal)
+    #Create slices, ie. windows of the data
+    X_d, y_d = create_dataset(signal_rewritten, window_size)
+    #Reshape data such that note and duration are concatenated. 
+    X_d_res = X_d.reshape((X_d.shape[0],2*window_size))
+    #Create one hot encoding
+    enc_X = OneHotEncoder(sparse = False, drop=None)
+    enc_y = OneHotEncoder(sparse = False, drop=None)
+    X_d_one = enc_X.fit_transform(X_d_res)
+    y_d_one = enc_y.fit_transform(y_d)
+    #Split data into train and test set
+    X_train, X_test, y_train, y_test = train_test_split(X_d_one, y_d_one, test_size=0.2, random_state=0, shuffle=False)
+    #Train a ridge regression model on training data.  
+    regressor = Ridge()
+    regressor.fit(X_train,y_train)
+    #Make predictions for test data 
+    y_pred = regressor.predict(X_test)
+    #Convert back to integer notes by taking the note with the maximum proability. 
+    y_test_orig = enc_y.inverse_transform(y_test)
+    y_pred_orig =enc_y.inverse_transform(y_pred)
+
+    # Show The difference between actual values and predicted values
+    df = pd.DataFrame({'Actual_Note': y_test_orig[:,0],'Actual_Duration': y_test_orig[:,1], 
+                       'Predicted_Note': y_pred_orig[:,0], 'Predicted_Duration': y_test_orig[:,1]})
+
+    #Measures for notes
+    performance[window_size,0] = metrics.mean_absolute_error(df['Actual_Note'], df['Predicted_Note'])
+    performance[window_size,1] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])
+    performance[window_size,2] = np.sqrt(metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note']))
+    
+    #Measures for durations
+    performance[window_size,3] = metrics.mean_absolute_error(df['Actual_Duration'], df['Predicted_Duration'])
+    performance[window_size,4] = metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])
+    performance[window_size,5] = np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
+    
+    #Corrected for window size
+    performance[window_size,6] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])/window_size
+    
 
 
+#Plot Error adjusted for window size for the notes. 
+plt.plot(performance[:,6])
+plt.legend(("MSE_Notes"))
+
+#Plot MSE per window size for duration. This has 100% accuracy tho so not really relevant. 
+plt.plot(performance[:,4])
+plt.legend(('MSE_dur'))
 
 

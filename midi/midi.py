@@ -31,11 +31,14 @@ def convert(channel):
 # # MIDI MAGIC
 
 # +
+# MIDIUtil parameters
 track = 0
 time = 0
 tempo = 105   #average BPM of bach
 volume = 100  #0-127
+# Custom parameters
 rythm = 4
+max_duration = 4
 
 MyMIDI = MIDIFile(1)
 MyMIDI.addTempo(track, time, tempo)
@@ -44,7 +47,7 @@ for channel in df_input:
     time_passed = 0
     for pitch, duration in convert(df_input[channel]):
         if pitch is not 0:
-            MyMIDI.addNote(track, channel, pitch, (time + time_passed)/rythm, duration, volume)
+            MyMIDI.addNote(track, channel, pitch, (time + time_passed)/rythm, min(duration, max_duration), volume)
         time_passed += duration
 # -
 

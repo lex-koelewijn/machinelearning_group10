@@ -19,7 +19,7 @@ def create_dataset(dataset, look_back=1):
 dataset = pd.read_csv('F.txt', sep='\t', header=None)
 dataset.head()
 dataset.describe()
-window_size = 20
+window_size = 40
 
 #Create data matrix with slices of 20 training data points of training data and 1 test point.
 X, y = create_dataset(dataset.loc[:,2].to_numpy(), window_size) 
@@ -214,7 +214,7 @@ signal = dataset.loc[:,2]
 
 def convert_to_note_and_duration(signal):
     converted_signal = []
-    duration = 1
+    duration = 0
     last_note = 0
     for note in signal:
         if note is last_note and duration < 16:
@@ -228,34 +228,20 @@ def convert_to_note_and_duration(signal):
 
 # +
 #Rewrite to note + duration
-result = convert_to_note_and_duration(signal)
+signal_rewritten = convert_to_note_and_duration(signal)
 
 #Create slices, ie. windows of the data
-X_d, y_d = create_dataset(result, window_size)
-
-# +
-# Some testing statements
-# print(len(np.unique(X_d[:,:,0])))
-# print(np.unique(X_d[:,:,0]))
-# print(len(np.unique(X_d[:,:,1])))
-# print(np.unique(X_d[:,:,1]))
-# print(y_d[657,:])
-# print(y_d[17,:])
+X_d, y_d = create_dataset(signal_rewritten, window_size)
 
 # +
 #Reshape data such that note and duration are concatenated. 
-X_d_res = X_d.reshape((685,40))
+X_d_res = X_d.reshape((X_d.shape[0],2*window_size))
 
 #Create one hot encoding
 enc_X = OneHotEncoder(sparse = False, drop=None)
 enc_y = OneHotEncoder(sparse = False, drop=None)
 X_d_one = enc_X.fit_transform(X_d_res)
 y_d_one = enc_y.fit_transform(y_d)
-
-# print(X_d_one.shape)
-# print(y_d_one.shape)
-# print(y_d_one[657,:])
-# print(y_d_one[17,:])
 
 
 # +
@@ -290,7 +276,7 @@ print('Mean Absolute Error:', metrics.mean_absolute_error(df['Actual_Duration'],
 print('Mean Squared Error:', metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
 print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])))
 
-# np.savetxt(r'np.txt', df.values, fmt='%d')
+
 # -
 
 def to_signal(note_duration):
@@ -306,26 +292,32 @@ def to_signal_long(note_duration):
 
 
 #Predict the next x steps using the trained regressor
-def make_prediction(signal, steps_to_predict=100):
+def make_prediction(signal, steps_to_predict=50):
     new_part = np.empty((steps_to_predict, 2))
     for i in range(0,steps_to_predict):
-        window = signal[len(signal)-window_size-1:len(signal)-1]
-        correct_shape = np.reshape(convert_to_note_and_duration(window), (2*window_size))
-        x = enc_X.transform(correct_shape.reshape(1,-1))
+        window = signal[len(signal)-window_size:len(signal)]
+        correct_shape = np.reshape(window, (2*window_size))
+        x = enc_X.transform(correct_shape.reshape(1, -1))
         pred = regressor.predict(x)
         next_step = enc_y.inverse_transform(pred)
-        signal = np.append(signal, to_signal_long(next_step))
+        signal.append((next_step[0,0], next_step[0,1]))
         new_part[i,:] = next_step
     return new_part
 
 
+#Keep a copy of the original variable such that it will not be edited. 
+original_copy = signal_rewritten[:]
+
 # +
-signal_fresh = dataset.loc[:,2].to_numpy() # Get the original signal
+#PLEASE NOTE:
+#Running the make prediction function multiple tiems will keep appending the signal and generating prediction on these new parts
+#rather than the original signal. 
 
 #Make prediction using the new regressor
-new = make_prediction(signal_fresh)
+new = make_prediction(signal_rewritten)
 new_signal = to_signal_long(new)
 print(new_signal)
+np.savetxt(r'new_signal.txt', new_signal, fmt='%d')
 # -
 
 

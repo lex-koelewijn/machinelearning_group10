@@ -226,7 +226,108 @@ def convert_to_note_and_duration(signal):
     return converted_signal
 
 
+# +
+#Rewrite to note + duration
 result = convert_to_note_and_duration(signal)
-print(result)
+
+#Create slices, ie. windows of the data
+X_d, y_d = create_dataset(result, window_size)
+
+# +
+# Some testing statements
+# print(len(np.unique(X_d[:,:,0])))
+# print(np.unique(X_d[:,:,0]))
+# print(len(np.unique(X_d[:,:,1])))
+# print(np.unique(X_d[:,:,1]))
+# print(y_d[657,:])
+# print(y_d[17,:])
+
+# +
+#Reshape data such that note and duration are concatenated. 
+X_d_res = X_d.reshape((685,40))
+
+#Create one hot encoding
+enc_X = OneHotEncoder(sparse = False, drop=None)
+enc_y = OneHotEncoder(sparse = False, drop=None)
+X_d_one = enc_X.fit_transform(X_d_res)
+y_d_one = enc_y.fit_transform(y_d)
+
+# print(X_d_one.shape)
+# print(y_d_one.shape)
+# print(y_d_one[657,:])
+# print(y_d_one[17,:])
+
+
+# +
+#Split data into train and test set
+X_train, X_test, y_train, y_test = train_test_split(X_d_one, y_d_one, test_size=0.2, random_state=0, shuffle=False)
+
+#Train a ridge regression model on training data.  
+regressor = Ridge()
+regressor.fit(X_train,y_train)
+
+#Make predictions for test data 
+y_pred = regressor.predict(X_test)
+
+# +
+#Convert back to integer notes by taking the note with the maximum proability. 
+y_test_orig = enc_y.inverse_transform(y_test)
+y_pred_orig =enc_y.inverse_transform(y_pred)
+
+# Show The difference between actual values and predicted values
+df = pd.DataFrame({'Actual_Note': y_test_orig[:,0],'Actual_Duration': y_test_orig[:,1], 
+                   'Predicted_Note': y_pred_orig[:,0], 'Predicted_Duration': y_test_orig[:,1]})
+print(df)
+
+#Show measures for notes and durations
+from sklearn import metrics
+print("Error measure for notes: ")
+print('Mean Absolute Error:', metrics.mean_absolute_error(df['Actual_Note'], df['Predicted_Note']))
+print('Mean Squared Error:', metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note']))
+print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])))
+print('\nError measure for duration: ')
+print('Mean Absolute Error:', metrics.mean_absolute_error(df['Actual_Duration'], df['Predicted_Duration']))
+print('Mean Squared Error:', metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
+print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])))
+
+# np.savetxt(r'np.txt', df.values, fmt='%d')
+# -
+
+def to_signal(note_duration):
+    return np.repeat(note_duration[0],note_duration[1])
+
+
+#Convert note and duration to an array representing the signal in terms of integers
+def to_signal_long(note_duration):
+    signal = []
+    for pair in note_duration:
+        signal = np.append(signal, to_signal(pair))
+    return signal
+
+
+#Predict the next x steps using the trained regressor
+def make_prediction(signal, steps_to_predict=100):
+    new_part = np.empty((steps_to_predict, 2))
+    for i in range(0,steps_to_predict):
+        window = signal[len(signal)-window_size-1:len(signal)-1]
+        correct_shape = np.reshape(convert_to_note_and_duration(window), (2*window_size))
+        x = enc_X.transform(correct_shape.reshape(1,-1))
+        pred = regressor.predict(x)
+        next_step = enc_y.inverse_transform(pred)
+        signal = np.append(signal, to_signal_long(next_step))
+        new_part[i,:] = next_step
+    return new_part
+
+
+# +
+signal_fresh = dataset.loc[:,2].to_numpy() # Get the original signal
+
+#Make prediction using the new regressor
+new = make_prediction(signal_fresh)
+new_signal = to_signal_long(new)
+print(new_signal)
+# -
+
+
 
 

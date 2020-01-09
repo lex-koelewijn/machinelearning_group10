@@ -6,9 +6,14 @@ from midiutil import MIDIFile
 
 # ### Data
 
+# +
 df_input = pd.read_csv('data/F.txt', sep='\t', header=None)
 df_input.head()
 
+df_input_lastpart = df_input.iloc[int(0.81*len(df_input[0])):]
+
+
+# -
 
 # ### Helper functions
 
@@ -38,7 +43,7 @@ tempo = 105   #average BPM of bach
 volume = 100  #0-127
 # Custom parameters
 rythm = 4
-max_duration = 4
+sound_duration = 2
 
 MyMIDI = MIDIFile(1)
 MyMIDI.addTempo(track, time, tempo)
@@ -47,7 +52,7 @@ for channel in df_input:
     time_passed = 0
     for pitch, duration in convert(df_input[channel]):
         if pitch is not 0:
-            MyMIDI.addNote(track, channel, pitch, (time + time_passed)/rythm, min(duration, max_duration), volume)
+            MyMIDI.addNote(track, channel, pitch, (time + time_passed)/rythm, sound_duration, volume)
         time_passed += duration
 # -
 

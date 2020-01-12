@@ -33,7 +33,6 @@ print(sorted_notes)
 
 # We want to find out if for example every four values have a correlation
 fig = sm.graphics.tsa.plot_acf(dataset.loc[:,2], lags=16)
-# Does not seem that there is a correlation when taking the n-order difference
 
 # +
 from sklearn.model_selection import train_test_split
@@ -69,7 +68,7 @@ y_pred = regressor.predict(X_test)
 # +
 #Show The difference between actual values and predicted values
 df = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
-print(df)
+# print(df)
 
 from sklearn import metrics
 print('Mean Absolute Error:', metrics.mean_absolute_error(y_test, y_pred))
@@ -132,7 +131,7 @@ y_pred_orig = one_hot_to_original_data(y_pred, y)
 
 # Show The difference between actual values and predicted values
 df = pd.DataFrame({'Actual': y_test_orig, 'Predicted': y_pred_orig})
-print(df)
+# print(df)
 
 from sklearn import metrics
 print('Mean Absolute Error:', metrics.mean_absolute_error(y_test_orig, y_pred_orig))
@@ -172,7 +171,7 @@ y_pred_orig = one_hot_to_original_data(y_pred, y)
 
 # Show The difference between actual values and predicted values
 df = pd.DataFrame({'Actual': y_test_orig, 'Predicted': y_pred_orig})
-print(df)
+# print(df)
 
 from sklearn import metrics
 print('Mean Absolute Error:', metrics.mean_absolute_error(y_test_orig, y_pred_orig))
@@ -230,6 +229,7 @@ def convert_to_note_and_duration(signal):
 #Rewrite to note + duration
 signal_rewritten = convert_to_note_and_duration(signal)
 
+
 #Create slices, ie. windows of the data
 X_d, y_d = create_dataset(signal_rewritten, window_size)
 
@@ -263,7 +263,7 @@ y_pred_orig =enc_y.inverse_transform(y_pred)
 # Show The difference between actual values and predicted values
 df = pd.DataFrame({'Actual_Note': y_test_orig[:,0],'Actual_Duration': y_test_orig[:,1], 
                    'Predicted_Note': y_pred_orig[:,0], 'Predicted_Duration': y_test_orig[:,1]})
-print(df)
+# print(df)
 
 #Show measures for notes and durations
 from sklearn import metrics
@@ -319,18 +319,24 @@ new_signal = to_signal_long(new)
 print(new_signal)
 np.savetxt(r'new_signal.txt', new_signal, fmt='%d')
 # -
+#Plot Comparisson of actual signal to predicted signal.
+plt.figure(figsize=(20,12))
+plt.plot(df.Actual_Note, label='Acutal Note')
+plt.plot(df.Predicted_Note, label = 'predicted Note')
+plt.legend()
+
 # Find optimal window size
 
 max_size = 100
 performance = np.empty((max_size+1, 7))
-for window_size in range(1,max_size):
+for size in range(1,max_size):
     signal = dataset.loc[:,2]
     #Rewrite to note + duration
     signal_rewritten = convert_to_note_and_duration(signal)
     #Create slices, ie. windows of the data
-    X_d, y_d = create_dataset(signal_rewritten, window_size)
+    X_d, y_d = create_dataset(signal_rewritten, size)
     #Reshape data such that note and duration are concatenated. 
-    X_d_res = X_d.reshape((X_d.shape[0],2*window_size))
+    X_d_res = X_d.reshape((X_d.shape[0],2*size))
     #Create one hot encoding
     enc_X = OneHotEncoder(sparse = False, drop=None)
     enc_y = OneHotEncoder(sparse = False, drop=None)
@@ -352,26 +358,178 @@ for window_size in range(1,max_size):
                        'Predicted_Note': y_pred_orig[:,0], 'Predicted_Duration': y_test_orig[:,1]})
 
     #Measures for notes
-    performance[window_size,0] = metrics.mean_absolute_error(df['Actual_Note'], df['Predicted_Note'])
-    performance[window_size,1] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])
-    performance[window_size,2] = np.sqrt(metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note']))
+    performance[size,0] = metrics.mean_absolute_error(df['Actual_Note'], df['Predicted_Note'])
+    performance[size,1] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])
+    performance[size,2] = np.sqrt(metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note']))
     
     #Measures for durations
-    performance[window_size,3] = metrics.mean_absolute_error(df['Actual_Duration'], df['Predicted_Duration'])
-    performance[window_size,4] = metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])
-    performance[window_size,5] = np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
+    performance[size,3] = metrics.mean_absolute_error(df['Actual_Duration'], df['Predicted_Duration'])
+    performance[size,4] = metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])
+    performance[size,5] = np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
     
     #Corrected for window size
-    performance[window_size,6] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])/window_size
-    
-
+    performance[size,6] = metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])/size
 
 #Plot Error adjusted for window size for the notes. 
 plt.plot(performance[:,6])
 plt.legend(("MSE_Notes"))
 
-#Plot MSE per window size for duration. This has 100% accuracy tho so not really relevant. 
-plt.plot(performance[:,4])
-plt.legend(('MSE_dur'))
+# # Chroma Circle 
+# Encode notes using the chroma circle so now notes turn into 5 features rather than a single integer. Regressor is now trained on 6 feautures, namely the chroma representation of a note plus its duration.
+
+# +
+import math
+signal = dataset.loc[:,2]
+#Rewrite to note + duration
+signal_rewritten = convert_to_note_and_duration(signal)
+
+#Create slices, ie. windows of the data
+X_d, y_d = create_dataset(signal_rewritten, window_size)
+
+
+# -
+
+def convert_to_chroma(midi_note, min_note, max_note):
+    chroma = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    radius_chroma = 1
+    c5 = [1, 8, 3, 10, 5, 12, 7, 2, 9, 4, 11, 6]
+    radius_c5 = 1
+    note = (midi_note-55) % 12
+    
+    chroma_angle = (chroma[note] - 1) * (360/12);
+    c5_angle = (c5[note] - 1) * (360/12);
+    
+    chroma_x = radius_chroma * math.sin(chroma_angle);
+    chroma_y = radius_chroma * math.cos(chroma_angle);
+    c5_x = radius_c5 * math.sin(c5_angle);
+    c5_y = radius_c5 * math.cos(c5_angle);
+    
+    n = midi_note - 69;
+    fx = 2**(n/12)*440;
+    
+    min_p = 2 * math.log(2**((min_note - 69)/12) * 440) / math.log(2);
+    max_p = 2 * math.log(2**((max_note - 69)/12) * 440)/ math.log(2);
+
+    pitch = 2 * math.log(fx)/math.log(2) - max_p + (max_p - min_p)/2;
+    y = [pitch, chroma_x, chroma_y, c5_x, c5_y];
+    return y
+
+# +
+# test = convert_to_chroma(54, np.unique(signal)[1], max(signal))
+
+# chroma_notes = np.empty((signal.shape[0], 5))
+# for idx, note in enumerate(signal):
+#     chroma_notes[idx,:] = convert_to_chroma(note, np.unique(signal)[1], max(signal))
+# -
+
+
+def rewrite_to_chroma_list(X_d, signal):
+    rewritten = []
+    for idx, note in enumerate(X_d):
+        for i in range(0, window_size): 
+            chroma_note = convert_to_chroma(X_d[idx,i,0], np.unique(signal)[1], max(signal))
+            rewritten.append((chroma_note, X_d[idx,i,1]))
+    return rewritten
+
+
+def to_chroma_format(X_d, rewritten):   
+    #First get notes and duration seperate from each other
+    X_d_notes= np.empty((X_d.shape[0], window_size, 5))
+    X_d_duration = np.empty((X_d.shape[0], window_size))
+    
+   #Create numpy arrays for the notes and the according durations
+    for idx in range(0, X_d.shape[0]): #n_samples
+        for i in range(0, window_size): 
+            note_list = rewritten[idx*window_size+i][0]
+            duration = rewritten[idx*window_size+i][1]
+            X_d_notes[idx,i,:] = note_list
+            X_d_duration[idx,i] = duration
+    
+    #Get everythin in numpy array in correct format for one hot encoding
+    X_d_np = np.empty((X_d.shape[0], window_size*6))
+    for idx in range(0, X_d.shape[0]): #n_samples
+        for i in range(0, window_size): 
+            tmp = np.array(X_d_notes[idx,i,:])
+            tmp = np.append(tmp, X_d_duration[idx,i])
+            X_d_np[idx, i*6:i*6+6]=tmp
+    return X_d_np
+
+
+# +
+rewritten = rewrite_to_chroma_list(X_d, signal)
+X_d_np = to_chroma_format(X_d, rewritten)
+
+#Create one hot encoding
+enc_X = OneHotEncoder(sparse = False, drop=None)
+enc_y = OneHotEncoder(sparse = False, drop=None)
+X_d_one = enc_X.fit_transform(X_d_np)
+y_d_one = enc_y.fit_transform(y_d)
+
+# +
+#Split data into train and test set
+X_train, X_test, y_train, y_test = train_test_split(X_d_one, y_d_one, test_size=0.2, random_state=0, shuffle=False)
+#Train a ridge regression model on training data.  
+regressor = Ridge()
+regressor.fit(X_train,y_train)
+#Make predictions for test data 
+y_pred = regressor.predict(X_test)
+#Convert back to integer notes by taking the note with the maximum proability. 
+y_test_orig = enc_y.inverse_transform(y_test)
+y_pred_orig =enc_y.inverse_transform(y_pred)
+
+# Show The difference between actual values and predicted values
+df = pd.DataFrame({'Actual_Note': y_test_orig[:,0],'Actual_Duration': y_test_orig[:,1], 
+                   'Predicted_Note': y_pred_orig[:,0], 'Predicted_Duration': y_test_orig[:,1]})
+
+#Show measures for notes and durations
+from sklearn import metrics
+print("Error measure for notes: ")
+print('Mean Absolute Error:', metrics.mean_absolute_error(df['Actual_Note'], df['Predicted_Note']))
+print('Mean Squared Error:', metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note']))
+print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(df['Actual_Note'], df['Predicted_Note'])))
+print('\nError measure for duration: ')
+print('Mean Absolute Error:', metrics.mean_absolute_error(df['Actual_Duration'], df['Predicted_Duration']))
+print('Mean Squared Error:', metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration']))
+print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(df['Actual_Duration'], df['Predicted_Duration'])))
+
+
+# -
+
+#Predict the next x steps using the trained regressor
+def make_prediction_chroma(signal, original_signal, steps_to_predict=50):
+    new_part = np.empty((steps_to_predict, 2))
+    for i in range(0,steps_to_predict):
+        window = signal[len(signal)-window_size:len(signal)]
+        #Get list of chroma notes
+        rewritten = []
+        for idx, pair in enumerate(window):
+            note = window[idx][0]
+            dur = window[idx][1]
+            chroma_note = convert_to_chroma(note, np.unique(original_signal)[1], max(original_signal))
+            rewritten.append((chroma_note, dur))
+        #Get the corect format as used for one hot encoder
+        chroma = to_chroma_format(np.empty((1,240)), rewritten)
+        x = enc_X.transform(chroma)
+        pred = regressor.predict(x)
+        next_step = enc_y.inverse_transform(pred)
+        signal.append((next_step[0,0], next_step[0,1]))
+        new_part[i,:] = next_step
+    return new_part
+
+
+# +
+#Make prediction using the new regressor
+new = make_prediction_chroma(signal_rewritten, signal, 100)
+new_signal = to_signal_long(new)
+
+print(new_signal)
+np.savetxt(r'chroma_prediction.txt', new_signal, fmt='%d')
+# -
+#Plot Comparisson of actual signal to predicted signal.
+plt.figure(figsize=(20,12))
+plt.plot(df.Actual_Note, label='Acutal Note')
+plt.plot(df.Predicted_Note, label = 'predicted Note')
+plt.legend()
+
 
 

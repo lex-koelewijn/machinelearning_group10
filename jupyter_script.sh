@@ -22,7 +22,7 @@ then
 	echo "[script] $filename.ipynb already exists! Exiting.."
 	exit 1
 else
-	echo "[script] $filename.ipynb already exists! Safe to continue."
+	echo "[script] No $filename.ipynb found. Safe to continue."
 fi
 
 echo "[script] Converting $filename.py to $filename.ipynb"

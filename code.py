@@ -1,3 +1,13 @@
+# # Predicting Bach using Window Based Linear Regression
+#
+# In this notebook we will try to predict Bach, ie we try to solve the time series prediction task of finishing his unfinished fugue. In the notebook we start with a simple regression on the data as is and we gradually move to more complex variations. To give short overview before being overwhelmed by the notebook:
+# 1. Simple window based linear regression on raw data 
+# 2. Window based linear regression but with one hot encodings of the notes
+# 3. Window based linear regression with one hot encodings of both the note and its duration. 
+# 4. Window based linear regression where the notes are represented by their chroma representation
+#
+# This means that large parts of the code get repeated with the adjustments made in order to make the new idea work. The notebook contains everything in order to show the progression we made during the project. 
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,7 +15,7 @@ import statsmodels.api as sm
 from matplotlib.ticker import MaxNLocator
 # %matplotlib inline
 
-#This function returns slices, currently only allows for an array as dataset. (Indexing should be altered when data is matrix.)
+#This function returns slices, currently only allows for an array (possibly of tuples) as dataset.
 def create_dataset(dataset, look_back=1):
     X, Y = [], []
     for i in range(len(dataset)-look_back-1):
@@ -19,17 +29,14 @@ def create_dataset(dataset, look_back=1):
 dataset = pd.read_csv('F.txt', sep='\t', header=None)
 dataset.head()
 dataset.describe()
-window_size = 40
+window_size = 40 #The window size is used throughout the enite notebook
 
-#Create data matrix with slices of 20 training data points of training data and 1 test point.
+#Create data matrix with slices of window_size training data points of training data and 1 test point. PLease note that only 1 voice is used.
 X, y = create_dataset(dataset.loc[:,2].to_numpy(), window_size) 
-#TODO: Vector encoding moet worden aangepast naar een formaat wat OK is. 
 # -
 
 # Create list of unique notes, which is later used for onehot encoding
 y_df = pd.DataFrame(y, columns=['notes'])
-sorted_notes = sorted(y_df['notes'].unique())
-print(sorted_notes)
 
 # We want to find out if for example every four values have a correlation
 fig = sm.graphics.tsa.plot_acf(dataset.loc[:,2], lags=16)
@@ -46,8 +53,8 @@ regressor.fit(X_train, y_train)
 
 # Show the predicted coefficients
 coeff_df = pd.DataFrame(regressor.coef_, columns=['Coefficient'])
-# Coefficients currently represent which of the past 20 notes in the window is most influential for the prediction.
-print(coeff_df['Coefficient'])
+# Coefficients currently represent which of the past window_size notes in the window is most influential for the prediction.
+# print(coeff_df['Coefficient'])
 
 # Plot the autocorrlation between different lags in the coefficients
 # Here we do see that there is some correlation between every fourth value
@@ -74,47 +81,12 @@ from sklearn import metrics
 print('Mean Absolute Error:', metrics.mean_absolute_error(y_test, y_pred))
 print('Mean Squared Error:', metrics.mean_squared_error(y_test, y_pred))
 print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
-# -
-# ## One Hot Vector With Reshaping Of Data
-# Train a linear regression again, but this time use One Hot encodings. In this implementation data is restructured but this seems to harm performance as you cannot iteratively train the linear model. 
-
-# +
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import OneHotEncoder
-
-#Create One hot encodings of X and y data. 
-onehot_encoder = OneHotEncoder(sparse=False)
-y_onehot = onehot_encoder.fit_transform(y.reshape(len(y),1))
-X_onehot = onehot_encoder.fit_transform(X)
-
-#Reshape X cause all training one hot vectors in the window get concatenated by sklearn. 
-X_onehot = X_onehot.reshape(X_onehot.shape[0], int(X_onehot.shape[1]/window_size), window_size)
-
-
-# +
-X_train, X_test, y_train, y_test = train_test_split(X_onehot, y_onehot, test_size=0.2, random_state=0, shuffle=False)
-
-#Train a linear model by going through each window of training data seperately. 
-regressor = LinearRegression()
-for i in range(0,X_train.shape[0]):
-    regressor.fit(X_train[i,:,:], y_train[i])
-
-#TODO: I am unsure you can train a model iterativly as I'm doing now.     
-#Show the predicted coefficients
-coeff_df = pd.DataFrame(regressor.coef_, columns=['Coefficient'])
-# #Coeffecients currently represent which of the past 20 notes in the window is most influential for the prediction.
-print(coeff_df)
-
-# +
-#Make predictions of our test data based on trained model
-y_pred = np.empty((X_test.shape[0], X_test.shape[1]))
-
-#Go through each testing window and predict. 
-for i in range(0,X_test.shape[0]):
-    y_pred[i] = regressor.predict(X_test[i,:,:])
 
 
 # -
+# # One Hot Vector Encoding of the data
+#
+# In this version we use one hot vector encodings for each individual note. So the input to the regressor will be a concatenated vector of window_size times a one hot vector representing a note. From hereonout we will use ridge regression rather than the standard linear regression.
 
 #Return the original integer note with the highest probability from the prediction. 
 def one_hot_to_original_data(y_onehot,y):
@@ -123,24 +95,6 @@ def one_hot_to_original_data(y_onehot,y):
         y_orig[i] = np.unique(y)[np.argmax(y_onehot[i,:])]
     return y_orig
 
-
-# +
-#Convert back to integer notes by taking the note with the maximum proability. 
-y_test_orig = one_hot_to_original_data(y_test, y)
-y_pred_orig = one_hot_to_original_data(y_pred, y)
-
-# Show The difference between actual values and predicted values
-df = pd.DataFrame({'Actual': y_test_orig, 'Predicted': y_pred_orig})
-# print(df)
-
-from sklearn import metrics
-print('Mean Absolute Error:', metrics.mean_absolute_error(y_test_orig, y_pred_orig))
-print('Mean Squared Error:', metrics.mean_squared_error(y_test_orig, y_pred_orig))
-print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test_orig, y_pred_orig)))
-# -
-# # One Hot Vector Without Reshaping Data
-#
-# In this version of the one hot vector incoding the data is not being reshaped, so we use the original concatenated input vector for training. This model has similar/slightly better performance than the simple linear regression using the notes as data.
 
 # +
 from sklearn.preprocessing import LabelEncoder
@@ -178,7 +132,7 @@ print('Mean Absolute Error:', metrics.mean_absolute_error(y_test_orig, y_pred_or
 print('Mean Squared Error:', metrics.mean_squared_error(y_test_orig, y_pred_orig))
 print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test_orig, y_pred_orig)))
 # -
-# Predict a new signal based on the last part of the signal and the window size
+# Predict a new signal based on the last part of the signal and the window size and keep iteratively updating the signal:
 
 # +
 # Define how many stes we want to predict and init required arrays
@@ -197,20 +151,16 @@ for i in range(0,steps_to_predict):
     np.append(signal, next_note)
     new_part[i] = next_note
     
-print("Newly predicted notes: \n", new_part)
+print("Newly predicted notes: \n", new_part) 
 # -
-# # Add features to vector encoding
-# Start off by encoding the signal by notes and their duration rather than just single notes.
+# # Add note and duration as features to vector encoding
+# We will now encode the signal in a different way namely, a note plus its duration. So now 10 repetions of the same note x will result in 1 tuple saying (x, 10). This representation thus adds duration as a feature to the encoding of the signal. The note and the duration will be represented by onehot vectors and for each pair of note plus duration in the window size these onehot vectors will be concatenated. Please note that a window size of x now no longer represent x notes, but x pairs of notes and their duration. Duration per not has a maximum value of 16, or 4 bars, because this is a natural representation in music. So if a note occurs longer than that it will be represented by multiple pairs. 
 
-# Opsplitsen in repetition van 16 is waarschijnlijk het handigst. Langere noten worden er dan meerdere.<br>
-# *Convert signal into note+duration <br>
-# *Create slices<br>
-# *Convert slices to one hot slices<br>
-# *Train regressor etc. <br>
-
+#Get one voice of the signal
 signal = dataset.loc[:,2]
 
 
+#convert a the raw signal to its notes and durations where durations are split up in max sizes of 16. 
 def convert_to_note_and_duration(signal):
     converted_signal = []
     duration = 0
@@ -228,7 +178,6 @@ def convert_to_note_and_duration(signal):
 # +
 #Rewrite to note + duration
 signal_rewritten = convert_to_note_and_duration(signal)
-
 
 #Create slices, ie. windows of the data
 X_d, y_d = create_dataset(signal_rewritten, window_size)
@@ -305,27 +254,25 @@ def make_prediction(signal, steps_to_predict=50):
     return new_part
 
 
-#Keep a copy of the original variable such that it will not be edited. 
-original_copy = signal_rewritten[:]
-
 # +
 #PLEASE NOTE:
-#Running the make prediction function multiple tiems will keep appending the signal and generating prediction on these new parts
+#Running the make prediction function more than once will keep appending the signal and generating predictions on these new parts
 #rather than the original signal. 
 
 #Make prediction using the new regressor
 new = make_prediction(signal_rewritten)
 new_signal = to_signal_long(new)
 print(new_signal)
-np.savetxt(r'new_signal.txt', new_signal, fmt='%d')
+# np.savetxt(r'new_signal.txt', new_signal, fmt='%d') #Print the new signal such that it can be converted to an audio file
 # -
-#Plot Comparisson of actual signal to predicted signal.
+#Plot Comparisson of actual signal to predicted signal to get a rough visusal representation of how well the prediction is.
 plt.figure(figsize=(20,12))
 plt.plot(df.Actual_Note, label='Acutal Note')
 plt.plot(df.Predicted_Note, label = 'predicted Note')
 plt.legend()
 
-# Find optimal window size
+# # Find optimal window size
+# Up to this point we had been using an arbitrarily chosen window size. In order to find out which size we should use we ran a sweep through the window_sizes, ie we trained a model using one hot vector encodings of both note and durations for a window size randing from 1-100 and plot the performance in order to decide on a good window size.  
 
 max_size = 100
 performance = np.empty((max_size+1, 7))
@@ -374,11 +321,14 @@ for size in range(1,max_size):
 plt.plot(performance[:,6])
 plt.legend(("MSE_Notes"))
 
-# # Chroma Circle 
+# So based on the plot above a windows size of 30-40 seems to be optimal.
+
+# # Chroma Circle feature representation
 # Encode notes using the chroma circle so now notes turn into 5 features rather than a single integer. Regressor is now trained on 6 feautures, namely the chroma representation of a note plus its duration.
 
 # +
 import math
+#Get one voice of the signal
 signal = dataset.loc[:,2]
 #Rewrite to note + duration
 signal_rewritten = convert_to_note_and_duration(signal)
@@ -387,7 +337,9 @@ signal_rewritten = convert_to_note_and_duration(signal)
 X_d, y_d = create_dataset(signal_rewritten, window_size)
 
 
-# -
+# +
+#Convert a note to a chroma represenation. 
+#This code was based on the implementation mentioned in the thesis 'Art in Echo State Networks:Music Generation' by Aulon Kuqi
 
 def convert_to_chroma(midi_note, min_note, max_note):
     chroma = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -414,15 +366,10 @@ def convert_to_chroma(midi_note, min_note, max_note):
     y = [pitch, chroma_x, chroma_y, c5_x, c5_y];
     return y
 
-# +
-# test = convert_to_chroma(54, np.unique(signal)[1], max(signal))
 
-# chroma_notes = np.empty((signal.shape[0], 5))
-# for idx, note in enumerate(signal):
-#     chroma_notes[idx,:] = convert_to_chroma(note, np.unique(signal)[1], max(signal))
 # -
 
-
+#Convert each note to a chroma represenation
 def rewrite_to_chroma_list(X_d, signal):
     rewritten = []
     for idx, note in enumerate(X_d):
@@ -432,6 +379,7 @@ def rewrite_to_chroma_list(X_d, signal):
     return rewritten
 
 
+#Rewrite the notes in chroma format and their duration to the required numpy format for one hot encoding. 
 def to_chroma_format(X_d, rewritten):   
     #First get notes and duration seperate from each other
     X_d_notes= np.empty((X_d.shape[0], window_size, 5))
@@ -456,6 +404,7 @@ def to_chroma_format(X_d, rewritten):
 
 
 # +
+#Get signal in the required format. 
 rewritten = rewrite_to_chroma_list(X_d, signal)
 X_d_np = to_chroma_format(X_d, rewritten)
 
@@ -469,7 +418,7 @@ y_d_one = enc_y.fit_transform(y_d)
 #Split data into train and test set
 X_train, X_test, y_train, y_test = train_test_split(X_d_one, y_d_one, test_size=0.2, random_state=0, shuffle=False)
 #Train a ridge regression model on training data.  
-regressor = Ridge()
+regressor = Ridge(alpha=1) #A paramtersweep for the value of alpha is executed later on.
 regressor.fit(X_train,y_train)
 #Make predictions for test data 
 y_pred = regressor.predict(X_test)
@@ -523,13 +472,28 @@ new = make_prediction_chroma(signal_rewritten, signal, 100)
 new_signal = to_signal_long(new)
 
 print(new_signal)
-np.savetxt(r'chroma_prediction.txt', new_signal, fmt='%d')
+np.savetxt(r'chroma_prediction.txt', new_signal, fmt='%d') #Save the signal predict using chroma representation to create an audio file
 # -
-#Plot Comparisson of actual signal to predicted signal.
+#Plot Comparisson of actual signal to predicted signal to get a rough visusal representation of how well the prediction is.
 plt.figure(figsize=(20,12))
 plt.plot(df.Actual_Note, label='Acutal Note')
 plt.plot(df.Predicted_Note, label = 'predicted Note')
 plt.legend()
 
+# # Parameter search for optimal alpha
+# Without specifying alpha in the ridge() function, the defautl will be 1. This need not be te best value, so we search for the optimal value for alpha using a Gridsearch. The optimal value turns out to be 1500 for our current model. 
 
+# +
+from sklearn import svm, datasets
+from sklearn.model_selection import GridSearchCV
 
+parameters = {'alpha':[0.5,1,2,3,4,5,7.5,10,15,20,25,30,35,40,50,100,200,500,750,1000,1250,1500,2000,5000,10000]}
+regressor = Ridge()
+clf = GridSearchCV(regressor, parameters, scoring ='r2')
+clf.fit(X_train,y_train)
+GridSearchCV(estimator=Ridge(), param_grid={'alpha': [0.5,1,2,3,4,5], 'kernel': ('linear', 'rbf')})
+# print(sorted(clf.cv_results_))
+
+result_frame = pd.DataFrame.from_dict(clf.cv_results_)
+print(result_frame)
+print(clf.best_estimator_)

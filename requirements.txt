@@ -4,4 +4,6 @@ pandas==0.24.2
 matplotlib==3.1.2
 numpy==1.17.4
 statsmodels==0.10.2
-sklearn==0.22.1
+scikit-learn==0.22
+MIDIUtil==1.2.1
+midi2audio==0.1.1

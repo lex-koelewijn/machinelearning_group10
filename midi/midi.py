@@ -7,7 +7,7 @@ from midiutil import MIDIFile
 # ### Data
 
 # +
-df_input = pd.read_csv('data/F.txt', sep='\t', header=None)
+df_input = pd.read_csv('data/combined.txt', sep='\t', header=None)
 df_input.head()
 
 df_input_lastpart = df_input.iloc[int(0.81*len(df_input[0])):]

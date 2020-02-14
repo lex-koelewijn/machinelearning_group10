@@ -35,3 +35,4 @@ bash jupyter_script.sh
 Select the ```code.py``` file in the interface by typing its number and pressing enter.
 
 Follow the URL that is given in the console. You should now see the notebook file opened, otherwise open it manually in the file explorer on the left side of the screen. Run a cell of code using ```CTRL + ENTER```.
+
